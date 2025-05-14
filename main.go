@@ -14,6 +14,7 @@ func main() {
 	storage.DB.AutoMigrate(&models.User{})
 
 	routes.RegisterUserRoutes(r)
+	routes.AuthRoutes(r)
 
 	r.Run(":8080")
 

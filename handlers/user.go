@@ -13,6 +13,19 @@ import (
 
 var validate = validator.New()
 
+func GetCurrentUser(c *gin.Context) {
+	userID := c.GetUint("user_id")
+
+	var user models.User
+
+	if err := storage.DB.First(&user, userID).Error; err != nil {
+		utils.RespondError(c, http.StatusNotFound, "Пользователь не найден")
+		return
+	}
+
+	utils.RespondOK(c, user)
+}
+
 func CreateUser(c *gin.Context) {
 	var user models.User
 	if err := c.ShouldBindJSON(&user); err != nil {
