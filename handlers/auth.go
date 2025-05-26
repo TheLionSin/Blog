@@ -8,6 +8,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/go-playground/validator/v10"
 	"net/http"
+	"strings"
 )
 
 func Register(c *gin.Context) {
@@ -42,19 +43,33 @@ func Register(c *gin.Context) {
 	input.Password = hashed
 
 	if err := storage.DB.Create(&input).Error; err != nil {
-		utils.RespondError(c, http.StatusInternalServerError, "Ошибка при создании")
+		// Проверка на дубликат по email
+		if strings.Contains(err.Error(), "duplicate key value") &&
+			strings.Contains(err.Error(), "users_email_key") {
+			utils.RespondError(c, http.StatusConflict, "Email уже используется")
+			return
+		}
+
+		utils.RespondError(c, http.StatusInternalServerError, "Ошибка при создании пользователя")
 		return
 	}
 
-	token, err := utils.GenerateJWT(input.ID)
+	accessToken, err := utils.GenerateJWT(input.ID)
+	if err != nil {
+		utils.RespondError(c, http.StatusInternalServerError, "Ошибка генерации токена")
+		return
+	}
+
+	refreshToken, err := utils.GenerateRefreshToken(input.ID)
 	if err != nil {
 		utils.RespondError(c, http.StatusInternalServerError, "Ошибка генерации токена")
 		return
 	}
 
 	utils.RespondCreated(c, gin.H{
-		"user":  input,
-		"token": token,
+		"user":          input,
+		"access_token":  accessToken,
+		"refresh_token": refreshToken,
 	})
 }
 
@@ -81,7 +96,13 @@ func Login(c *gin.Context) {
 		return
 	}
 
-	token, err := utils.GenerateJWT(user.ID)
+	accessToken, err := utils.GenerateJWT(user.ID)
+	if err != nil {
+		utils.RespondError(c, http.StatusInternalServerError, "Ошибка генерации токена")
+		return
+	}
+
+	refreshToken, err := utils.GenerateRefreshToken(user.ID)
 	if err != nil {
 		utils.RespondError(c, http.StatusInternalServerError, "Ошибка генерации токена")
 		return
@@ -90,7 +111,34 @@ func Login(c *gin.Context) {
 	user.Password = ""
 
 	utils.RespondOK(c, gin.H{
-		"user":  user,
-		"token": token,
+		"user":          user,
+		"access_token":  accessToken,
+		"refresh_token": refreshToken,
+	})
+}
+
+func RefreshToken(c *gin.Context) {
+	var input struct {
+		RefreshToken string `json:"refresh_token"`
+	}
+	if err := c.BindJSON(&input); err != nil {
+		utils.RespondError(c, http.StatusBadRequest, "Неверный запрос")
+		return
+	}
+
+	userID, err := utils.ParseRefreshToken(input.RefreshToken)
+	if err != nil {
+		utils.RespondError(c, http.StatusUnauthorized, err.Error())
+		return
+	}
+
+	newAccessToken, err := utils.GenerateJWT(userID)
+	if err != nil {
+		utils.RespondError(c, http.StatusInternalServerError, "Не удалось выдать новый токен")
+		return
+	}
+
+	utils.RespondOK(c, gin.H{
+		"access_token": newAccessToken,
 	})
 }
