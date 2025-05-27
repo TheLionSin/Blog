@@ -66,10 +66,11 @@ func Register(c *gin.Context) {
 		return
 	}
 
+	c.SetCookie("refresh_token", refreshToken, 7*24*60*60, "/", "", true, true)
+
 	utils.RespondCreated(c, gin.H{
-		"user":          input,
-		"access_token":  accessToken,
-		"refresh_token": refreshToken,
+		"user":         input,
+		"access_token": accessToken,
 	})
 }
 
@@ -108,25 +109,25 @@ func Login(c *gin.Context) {
 		return
 	}
 
+	c.SetCookie("refresh_token", refreshToken, 7*24*60*60, "/", "", true, true)
+
 	user.Password = ""
 
 	utils.RespondOK(c, gin.H{
-		"user":          user,
-		"access_token":  accessToken,
-		"refresh_token": refreshToken,
+		"user":         user,
+		"access_token": accessToken,
 	})
 }
 
 func RefreshToken(c *gin.Context) {
-	var input struct {
-		RefreshToken string `json:"refresh_token"`
-	}
-	if err := c.BindJSON(&input); err != nil {
-		utils.RespondError(c, http.StatusBadRequest, "Неверный запрос")
+
+	refreshToken, err := c.Cookie("refresh_token")
+	if err != nil {
+		utils.RespondError(c, http.StatusUnauthorized, "Нет refresh токена")
 		return
 	}
 
-	userID, err := utils.ParseRefreshToken(input.RefreshToken)
+	userID, err := utils.ParseRefreshToken(refreshToken)
 	if err != nil {
 		utils.RespondError(c, http.StatusUnauthorized, err.Error())
 		return
@@ -140,5 +141,13 @@ func RefreshToken(c *gin.Context) {
 
 	utils.RespondOK(c, gin.H{
 		"access_token": newAccessToken,
+	})
+}
+
+func Logout(c *gin.Context) {
+	c.SetCookie("refresh_token", "", -1, "/", "", true, true)
+
+	utils.RespondOK(c, gin.H{
+		"message": "Вы вышли из системы",
 	})
 }
