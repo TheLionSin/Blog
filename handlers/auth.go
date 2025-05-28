@@ -1,29 +1,25 @@
 package handlers
 
 import (
+	"Blog/dto"
 	"Blog/models"
 	"Blog/storage"
 	"Blog/utils"
-	"fmt"
 	"github.com/gin-gonic/gin"
-	"github.com/go-playground/validator/v10"
 	"net/http"
 	"strings"
 )
 
 func Register(c *gin.Context) {
-	var input models.User
+	var input dto.RegisterInput
 
-	if err := c.BindJSON(&input); err != nil {
+	if err := c.ShouldBindJSON(&input); err != nil {
 		utils.RespondError(c, http.StatusBadRequest, "Неверный JSON")
 		return
 	}
 
 	if err := validate.Struct(input); err != nil {
-		errors := make(map[string]string)
-		for _, e := range err.(validator.ValidationErrors) {
-			errors[e.Field()] = fmt.Sprintf("Не проходит '%s'", e.Tag())
-		}
+		errors := utils.FormatValidationError(err)
 		utils.RespondError(c, http.StatusBadRequest, errors)
 		return
 	}
@@ -40,9 +36,13 @@ func Register(c *gin.Context) {
 		return
 	}
 
-	input.Password = hashed
+	user := models.User{
+		Nickname: input.Nickname,
+		Email:    input.Email,
+		Password: hashed,
+	}
 
-	if err := storage.DB.Create(&input).Error; err != nil {
+	if err := storage.DB.Create(&user).Error; err != nil {
 		// Проверка на дубликат по email
 		if strings.Contains(err.Error(), "duplicate key value") &&
 			strings.Contains(err.Error(), "users_email_key") {
@@ -54,13 +54,13 @@ func Register(c *gin.Context) {
 		return
 	}
 
-	accessToken, err := utils.GenerateJWT(input.ID)
+	accessToken, err := utils.GenerateJWT(user.ID)
 	if err != nil {
 		utils.RespondError(c, http.StatusInternalServerError, "Ошибка генерации токена")
 		return
 	}
 
-	refreshToken, err := utils.GenerateRefreshToken(input.ID)
+	refreshToken, err := utils.GenerateRefreshToken(user.ID)
 	if err != nil {
 		utils.RespondError(c, http.StatusInternalServerError, "Ошибка генерации токена")
 		return
@@ -69,19 +69,22 @@ func Register(c *gin.Context) {
 	c.SetCookie("refresh_token", refreshToken, 7*24*60*60, "/", "", true, true)
 
 	utils.RespondCreated(c, gin.H{
-		"user":         input,
+		"user":         dto.ToUserResponse(user),
 		"access_token": accessToken,
 	})
 }
 
 func Login(c *gin.Context) {
-	var input struct {
-		Email    string `json:"email"`
-		Password string `json:"password"`
+	var input dto.LoginInput
+
+	if err := c.ShouldBindJSON(&input); err != nil {
+		utils.RespondError(c, http.StatusBadGateway, "Неверный JSON")
+		return
 	}
 
-	if err := c.BindJSON(&input); err != nil {
-		utils.RespondError(c, http.StatusBadGateway, "Неверный JSON")
+	if err := validate.Struct(input); err != nil {
+		errors := utils.FormatValidationError(err)
+		utils.RespondError(c, http.StatusBadRequest, errors)
 		return
 	}
 
@@ -114,7 +117,7 @@ func Login(c *gin.Context) {
 	user.Password = ""
 
 	utils.RespondOK(c, gin.H{
-		"user":         user,
+		"user":         dto.ToUserResponse(user),
 		"access_token": accessToken,
 	})
 }
