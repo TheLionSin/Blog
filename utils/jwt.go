@@ -19,6 +19,28 @@ func GenerateJWT(userID uint) (string, error) {
 	return token.SignedString(jwtSecret)
 }
 
+func ParseAccessToken(tokenStr string) (uint, error) {
+	token, err := jwt.Parse(tokenStr, func(t *jwt.Token) (interface{}, error) {
+		return jwtSecret, nil
+	})
+
+	if err != nil || !token.Valid {
+		return 0, errors.New("invalid token")
+	}
+
+	claims, ok := token.Claims.(jwt.MapClaims)
+	if !ok || claims["type"] != "access" {
+		return 0, errors.New("это не access token")
+	}
+
+	idFloat, ok := claims["user_id"].(float64)
+	if !ok {
+		return 0, errors.New("ошибка в токене")
+	}
+
+	return uint(idFloat), nil
+}
+
 func ParseJWT(tokenStr string) (uint, error) {
 	token, err := jwt.Parse(tokenStr, func(t *jwt.Token) (interface{}, error) {
 		return jwtSecret, nil

@@ -10,23 +10,17 @@ import (
 func RequireAuth() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		authHeader := c.GetHeader("Authorization")
-		if authHeader == "" {
-			utils.RespondError(c, http.StatusUnauthorized, "Требуется токен")
-			c.Abort()
-			return
-		}
-
-		if !strings.HasPrefix(authHeader, "Bearer ") {
-			utils.RespondError(c, http.StatusUnauthorized, "Неверный формат токена")
+		if authHeader == "" || !strings.HasPrefix(authHeader, "Bearer ") {
+			utils.RespondError(c, http.StatusUnauthorized, "Требуется access токен")
 			c.Abort()
 			return
 		}
 
 		tokenStr := strings.TrimPrefix(authHeader, "Bearer ")
-		
-		userID, err := utils.ParseJWT(tokenStr)
+
+		userID, err := utils.ParseAccessToken(tokenStr)
 		if err != nil {
-			utils.RespondError(c, http.StatusUnauthorized, "Неверный токен")
+			utils.RespondError(c, http.StatusUnauthorized, err.Error())
 			c.Abort()
 			return
 		}
