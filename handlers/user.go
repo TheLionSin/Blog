@@ -9,6 +9,7 @@ import (
 	"github.com/go-playground/validator/v10"
 	"github.com/jackc/pgx/v5/pgconn"
 	"net/http"
+	"strconv"
 )
 
 var validate = validator.New()
@@ -107,15 +108,39 @@ func DeleteUser(c *gin.Context) {
 }
 
 func GetUsers(c *gin.Context) {
-	var users []models.User
-	if err := storage.DB.Find(&users).Error; err != nil {
-		utils.RespondError(c, http.StatusInternalServerError, "Не удалось получить пользователей")
-		return
-	} else if len(users) == 0 {
-		utils.RespondOK(c, "В данный момент неу записей.")
+
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "10"))
+
+	if page < 1 {
+		page = 1
 	}
 
-	utils.RespondOK(c, users)
+	if limit < 1 || limit > 100 {
+		limit = 10
+	}
+
+	offset := (page - 1) * limit
+
+	var users []models.User
+	var total int64
+
+	storage.DB.Model(&models.User{}).Count(&total)
+
+	err := storage.DB.Limit(limit).Offset(offset).Find(&users).Error
+
+	if err != nil {
+		utils.RespondError(c, http.StatusInternalServerError, "Ошибка при получении пользователей")
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"success": true,
+		"total":   total,
+		"page":    page,
+		"limit":   limit,
+		"data":    users,
+	})
 
 }
 
