@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"Blog/dto"
 	"Blog/models"
 	"Blog/storage"
 	"Blog/utils"
@@ -15,7 +16,11 @@ import (
 var validate = validator.New()
 
 func GetCurrentUser(c *gin.Context) {
-	userID := c.GetUint("user_id")
+	userID, ok := c.Get("user_id")
+	if !ok {
+		utils.RespondError(c, http.StatusUnauthorized, "Пользователь не найден")
+		return
+	}
 
 	var user models.User
 
@@ -24,7 +29,9 @@ func GetCurrentUser(c *gin.Context) {
 		return
 	}
 
-	utils.RespondOK(c, user)
+	utils.RespondOK(c, gin.H{
+		"user": dto.ToUserResponse(user),
+	})
 }
 
 func CreateUser(c *gin.Context) {
