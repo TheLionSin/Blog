@@ -13,6 +13,12 @@ type LoginInput struct {
 	Password string `json:"password" validate:"required"`
 }
 
+type UpdateUserInput struct {
+	Nickname string `json:"nickname" validate:"required"`
+	Email    string `json:"email" validate:"required,email"`
+	Password string `json:"password" validate:"omitempty, min=5"`
+}
+
 type UserResponse struct {
 	ID       uint   `json:"id"`
 	Nickname string `json:"nickname"`
@@ -25,4 +31,10 @@ func ToUserResponse(u models.User) UserResponse {
 		Nickname: u.Nickname,
 		Email:    u.Email,
 	}
+}
+
+type CreateUserInput struct {
+	Nickname string `json:"nickname" validate:"required,min=3"`
+	Email    string `json:"email" validate:"required,email"`
+	Password string `json:"password" validate:"required,min=5"`
 }

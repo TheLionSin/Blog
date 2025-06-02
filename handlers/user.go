@@ -5,10 +5,8 @@ import (
 	"Blog/models"
 	"Blog/storage"
 	"Blog/utils"
-	"fmt"
 	"github.com/gin-gonic/gin"
 	"github.com/go-playground/validator/v10"
-	"github.com/jackc/pgx/v5/pgconn"
 	"net/http"
 	"strconv"
 )
@@ -35,128 +33,173 @@ func GetCurrentUser(c *gin.Context) {
 }
 
 func CreateUser(c *gin.Context) {
-	var user models.User
-	if err := c.ShouldBindJSON(&user); err != nil {
-		utils.RespondError(c, http.StatusBadRequest, "Invalid JSON")
-		return
-	}
-	if err := validate.Struct(user); err != nil {
-		errors := make(map[string]string)
-		for _, e := range err.(validator.ValidationErrors) {
-			errors[e.Field()] = fmt.Sprintf("Ошибка поля '%s'", e.Tag())
-		}
+
+	var input dto.CreateUserInput
+
+	if err := c.ShouldBindJSON(&input); err != nil {
+		errors := utils.FormatValidationError(err)
 		utils.RespondError(c, http.StatusBadRequest, errors)
 		return
 	}
-	if err := storage.DB.Create(&user).Error; err != nil {
-		if pgErr, ok := err.(*pgconn.PgError); ok && pgErr.Code == "23505" {
-			switch pgErr.ConstraintName {
-			case "uni_users_nickname":
-				utils.RespondError(c, http.StatusConflict, fmt.Sprintf("Никнейм '%s' уже используется", user.Nickname))
-				return
-			case "uni_users_email":
-				utils.RespondError(c, http.StatusConflict, fmt.Sprintf("Email '%s' уже используется", user.Email))
-				return
-			default:
-				utils.RespondError(c, http.StatusConflict, "Пользователь с таким email или никнеймом уже существует")
-				return
-			}
-		}
-		utils.RespondError(c, http.StatusBadRequest, "Ошибка при сохранении пользователя")
+
+	var existing models.User
+	if err := storage.DB.Where("email = ?", input.Email).First(&existing).Error; err == nil {
+		utils.RespondError(c, http.StatusBadRequest, "Email уже зарегистрирован")
 		return
 	}
-	utils.RespondCreated(c, user)
+
+	hashedPassword, err := utils.HashPassword(input.Password)
+	if err != nil {
+		utils.RespondError(c, http.StatusInternalServerError, "Не удалось зашифровать пароль")
+		return
+	}
+
+	user := models.User{
+		Nickname: input.Nickname,
+		Email:    input.Email,
+		Password: hashedPassword,
+	}
+
+	if err := storage.DB.Create(&user).Error; err != nil {
+		utils.RespondError(c, http.StatusInternalServerError, "Ошибка при создании пользователя")
+		return
+	}
+
+	utils.RespondOK(c, gin.H{
+		"user": dto.ToUserResponse(user),
+	})
+
 }
 
 func UpdateUser(c *gin.Context) {
+
+	idParam := c.Param("id")
+	userID, err := strconv.Atoi(idParam)
+	if err != nil {
+		utils.RespondError(c, http.StatusBadRequest, "Некорректный ID")
+		return
+	}
+
+	var input dto.UpdateUserInput
+	if err := c.ShouldBindJSON(&input); err != nil {
+		errors := utils.FormatValidationError(err)
+		utils.RespondError(c, http.StatusBadRequest, errors)
+		return
+	}
+
 	var user models.User
-	id := c.Param("id")
-	if err := storage.DB.First(&user, id).Error; err != nil {
+	if err := storage.DB.First(&user, userID).Error; err != nil {
 		utils.RespondError(c, http.StatusNotFound, "Пользователь не найден")
 		return
 	}
 
-	var input models.User
-	if err := c.ShouldBindJSON(&input); err != nil {
-		utils.RespondError(c, http.StatusBadRequest, "Неверный JSON")
-		return
+	if input.Nickname != "" {
+		user.Nickname = input.Nickname
 	}
-	if err := validate.Struct(input); err != nil {
-		errors := make(map[string]string)
-		for _, e := range err.(validator.ValidationErrors) {
-			errors[e.Field()] = fmt.Sprintf("Ошибка поля '%s'", e.Tag())
+	if input.Email != "" {
+		user.Email = input.Email
+	}
+	if input.Password != "" {
+		hashedPassword, err := utils.HashPassword(input.Password)
+		if err != nil {
+			utils.RespondError(c, http.StatusInternalServerError, "Не удалось зашифровать пароль")
+			return
 		}
-		utils.RespondError(c, http.StatusBadRequest, errors)
-		return
+		user.Password = hashedPassword
 	}
-
-	user.Nickname = input.Nickname
-	user.Email = input.Email
 
 	if err := storage.DB.Save(&user).Error; err != nil {
-		utils.RespondError(c, http.StatusInternalServerError, "Ошибка при сохранении пользователя")
+		utils.RespondError(c, http.StatusInternalServerError, "Ошибка при обновлении пользователя")
 		return
 	}
-	utils.RespondOK(c, gin.H{"Пользователь обновлен": user})
+
+	utils.RespondOK(c, gin.H{
+		"user": dto.ToUserResponse(user),
+	})
 
 }
 
 func DeleteUser(c *gin.Context) {
-	id := c.Param("id")
-	var user models.User
-	if err := storage.DB.First(&user, id).Error; err != nil {
-		utils.RespondError(c, http.StatusNotFound, "Пользователь не существует")
+
+	idParam := c.Param("id")
+	userID, err := strconv.Atoi(idParam)
+	if err != nil {
+		utils.RespondError(c, http.StatusBadRequest, "Некорректный ID")
 		return
 	}
+
+	var user models.User
+	if err := storage.DB.First(&user, userID).Error; err != nil {
+		utils.RespondError(c, http.StatusNotFound, "Пользователь не найден")
+		return
+	}
+
 	if err := storage.DB.Delete(&user).Error; err != nil {
 		utils.RespondError(c, http.StatusInternalServerError, "Ошибка при удалении")
+		return
 	}
-	utils.RespondOK(c, "Пользователь удален")
+
+	utils.RespondOK(c, gin.H{
+		"message": "Пользователь удален",
+	})
+
 }
 
 func GetUsers(c *gin.Context) {
 
-	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
-	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "10"))
+	var users []models.User
 
-	if page < 1 {
-		page = 1
-	}
+	limitStr := c.DefaultQuery("limit", "10")
+	pageStr := c.DefaultQuery("page", "1")
+	search := c.Query("search")
 
-	if limit < 1 || limit > 100 {
+	limit, _ := strconv.Atoi(limitStr)
+	page, _ := strconv.Atoi(pageStr)
+	if limit <= 0 {
 		limit = 10
 	}
-
+	if page <= 0 {
+		page = 1
+	}
 	offset := (page - 1) * limit
 
-	var users []models.User
-	var total int64
+	query := storage.DB.Limit(limit).Offset(offset)
+	if search != "" {
+		term := "%" + search + "%"
+		query = query.Where("name ILIKE ? or email ILIKE ?", term, term)
+	}
 
-	storage.DB.Model(&models.User{}).Count(&total)
-
-	err := storage.DB.Limit(limit).Offset(offset).Find(&users).Error
-
-	if err != nil {
+	if err := query.Find(&users).Error; err != nil {
 		utils.RespondError(c, http.StatusInternalServerError, "Ошибка при получении пользователей")
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"success": true,
-		"total":   total,
-		"page":    page,
-		"limit":   limit,
-		"data":    users,
+	var response []dto.UserResponse
+	for _, u := range users {
+		response = append(response, dto.ToUserResponse(u))
+	}
+
+	utils.RespondOK(c, gin.H{
+		"users": response,
 	})
 
 }
 
 func GetUser(c *gin.Context) {
-	var user models.User
-	id := c.Param("id")
-	if err := storage.DB.First(&user, id).Error; err != nil {
-		utils.RespondError(c, http.StatusInternalServerError, "Не удалось получить пользователя")
+	idParam := c.Param("id")
+	userID, err := strconv.Atoi(idParam)
+	if err != nil {
+		utils.RespondError(c, http.StatusBadRequest, "Некорректный ID")
 		return
 	}
-	utils.RespondOK(c, user)
+
+	var user models.User
+	if err := storage.DB.First(&user, userID).Error; err != nil {
+		utils.RespondError(c, http.StatusNotFound, "Пользователь не найден")
+		return
+	}
+
+	utils.RespondOK(c, gin.H{
+		"user": dto.ToUserResponse(user),
+	})
 }
