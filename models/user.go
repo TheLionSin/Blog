@@ -7,5 +7,6 @@ type User struct {
 	Nickname     string    `gorm:"unique;not null"`
 	Email        string    `gorm:"unique;not null"`
 	Password     string    `gorm:"not null"`
+	Role         string    `gorm:"type:varchar(20);default:'user'"`
 	RegisteredAt time.Time `gorm:"autoCreateTime"`
 }

@@ -1,6 +1,8 @@
 package middleware
 
 import (
+	"Blog/models"
+	"Blog/storage"
 	"Blog/utils"
 	"github.com/gin-gonic/gin"
 	"net/http"
@@ -31,7 +33,7 @@ func RequireAuth() gin.HandlerFunc {
 	}
 }
 
-func CanEditUser() gin.HandlerFunc {
+func CanEditOrAdmin() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		authUserID := c.GetUint("user_id")
 
@@ -43,8 +45,35 @@ func CanEditUser() gin.HandlerFunc {
 			return
 		}
 
-		if uint(targetID) != authUserID {
+		var user models.User
+		if err := storage.DB.First(&user, authUserID).Error; err != nil {
+			utils.RespondError(c, http.StatusUnauthorized, "Пользователь не найден")
+			c.Abort()
+			return
+		}
+
+		if uint(targetID) != authUserID && user.Role != "admin" {
 			utils.RespondError(c, http.StatusForbidden, "Нет прав на редактирование")
+			c.Abort()
+			return
+		}
+		c.Next()
+	}
+}
+
+func RequireAdmin() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		userID := c.GetUint("user_id")
+
+		var user models.User
+		if err := storage.DB.First(&user, userID).Error; err != nil {
+			utils.RespondError(c, http.StatusUnauthorized, "Пользователь не найден")
+			c.Abort()
+			return
+		}
+
+		if user.Role != "admin" {
+			utils.RespondError(c, http.StatusForbidden, "Требуются права администратора")
 			c.Abort()
 			return
 		}

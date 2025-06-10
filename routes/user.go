@@ -15,6 +15,6 @@ func RegisterUserRoutes(r *gin.Engine) {
 	protected.POST("/user", handlers.CreateUser)
 	protected.GET("/me", handlers.GetCurrentUser)
 
-	protected.PUT("/user/:id", middleware.CanEditUser(), handlers.UpdateUser)
-	protected.DELETE("/user/:id", middleware.CanEditUser(), handlers.DeleteUser)
+	protected.PUT("/user/:id", middleware.CanEditOrAdmin(), handlers.UpdateUser)
+	protected.DELETE("/user/:id", middleware.CanEditOrAdmin(), handlers.DeleteUser)
 }
