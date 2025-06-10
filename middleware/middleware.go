@@ -4,6 +4,7 @@ import (
 	"Blog/utils"
 	"github.com/gin-gonic/gin"
 	"net/http"
+	"strconv"
 	"strings"
 )
 
@@ -26,6 +27,27 @@ func RequireAuth() gin.HandlerFunc {
 		}
 
 		c.Set("user_id", userID)
+		c.Next()
+	}
+}
+
+func CanEditUser() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		authUserID := c.GetUint("user_id")
+
+		idParam := c.Param("id")
+		targetID, err := strconv.Atoi(idParam)
+		if err != nil {
+			utils.RespondError(c, http.StatusBadRequest, "Некорректный ID")
+			c.Abort()
+			return
+		}
+
+		if uint(targetID) != authUserID {
+			utils.RespondError(c, http.StatusForbidden, "Нет прав на редактирование")
+			c.Abort()
+			return
+		}
 		c.Next()
 	}
 }

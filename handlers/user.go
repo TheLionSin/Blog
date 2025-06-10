@@ -74,9 +74,15 @@ func CreateUser(c *gin.Context) {
 func UpdateUser(c *gin.Context) {
 
 	idParam := c.Param("id")
-	userID, err := strconv.Atoi(idParam)
+	targetID, err := strconv.Atoi(idParam)
 	if err != nil {
 		utils.RespondError(c, http.StatusBadRequest, "Некорректный ID")
+		return
+	}
+
+	var user models.User
+	if err := storage.DB.First(&user, targetID).Error; err != nil {
+		utils.RespondError(c, http.StatusNotFound, "Пользователь не найден")
 		return
 	}
 
@@ -84,12 +90,6 @@ func UpdateUser(c *gin.Context) {
 	if err := c.ShouldBindJSON(&input); err != nil {
 		errors := utils.FormatValidationError(err)
 		utils.RespondError(c, http.StatusBadRequest, errors)
-		return
-	}
-
-	var user models.User
-	if err := storage.DB.First(&user, userID).Error; err != nil {
-		utils.RespondError(c, http.StatusNotFound, "Пользователь не найден")
 		return
 	}
 
@@ -122,14 +122,14 @@ func UpdateUser(c *gin.Context) {
 func DeleteUser(c *gin.Context) {
 
 	idParam := c.Param("id")
-	userID, err := strconv.Atoi(idParam)
+	targetID, err := strconv.Atoi(idParam)
 	if err != nil {
 		utils.RespondError(c, http.StatusBadRequest, "Некорректный ID")
 		return
 	}
-
+	
 	var user models.User
-	if err := storage.DB.First(&user, userID).Error; err != nil {
+	if err := storage.DB.First(&user, targetID).Error; err != nil {
 		utils.RespondError(c, http.StatusNotFound, "Пользователь не найден")
 		return
 	}
