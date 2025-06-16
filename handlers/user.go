@@ -5,10 +5,14 @@ import (
 	"Blog/models"
 	"Blog/storage"
 	"Blog/utils"
+	"fmt"
 	"github.com/gin-gonic/gin"
 	"github.com/go-playground/validator/v10"
 	"net/http"
+	"os"
+	"path/filepath"
 	"strconv"
+	"strings"
 )
 
 var validate = validator.New()
@@ -127,7 +131,7 @@ func DeleteUser(c *gin.Context) {
 		utils.RespondError(c, http.StatusBadRequest, "Некорректный ID")
 		return
 	}
-	
+
 	var user models.User
 	if err := storage.DB.First(&user, targetID).Error; err != nil {
 		utils.RespondError(c, http.StatusNotFound, "Пользователь не найден")
@@ -201,5 +205,46 @@ func GetUser(c *gin.Context) {
 
 	utils.RespondOK(c, gin.H{
 		"user": dto.ToUserResponse(user),
+	})
+}
+
+func UploadAvatar(c *gin.Context) {
+	userID := c.GetUint("user_id")
+
+	file, err := c.FormFile("avatar")
+	if err != nil {
+		utils.RespondError(c, http.StatusBadRequest, "Файл не найден")
+		return
+	}
+
+	var user models.User
+	if err := storage.DB.First(&user, userID).Error; err != nil {
+		utils.RespondError(c, http.StatusNotFound, "Пользователь не найден")
+		return
+	}
+
+	if user.AvatarURL != "" {
+		oldPath := strings.TrimPrefix(user.AvatarURL, "/")
+		if err := os.Remove(oldPath); err != nil && !os.IsNotExist(err) {
+			fmt.Println("Ошибка при удалении старого аватара:", err)
+		}
+	}
+
+	filename := fmt.Sprintf("avatar_%d%s", userID, filepath.Ext(file.Filename))
+	path := filepath.Join("uploads", filename)
+
+	if err := c.SaveUploadedFile(file, path); err != nil {
+		utils.RespondError(c, http.StatusInternalServerError, "Не удалось сохранить файл")
+		return
+	}
+
+	avatarURL := "/uploads/" + filename
+	if err := storage.DB.Model(&models.User{}).Where("id = ?", userID).Update("avatar_url", avatarURL).Error; err != nil {
+		utils.RespondError(c, http.StatusInternalServerError, "Не удалось обновить профиль")
+		return
+	}
+
+	utils.RespondOK(c, gin.H{
+		"avatar_url": avatarURL,
 	})
 }

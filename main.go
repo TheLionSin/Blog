@@ -10,6 +10,7 @@ import (
 func main() {
 
 	r := gin.Default()
+	r.Static("/uploads", "./uploads")
 	storage.ConnectDB()
 	migrate.RunMigrations()
 
