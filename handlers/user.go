@@ -77,7 +77,6 @@ func CreateUser(c *gin.Context) {
 
 func UpdateUser(c *gin.Context) {
 
-	authUserID := c.GetUint("user_id")
 	idParam := c.Param("id")
 	targetID, err := strconv.Atoi(idParam)
 	if err != nil {
@@ -122,13 +121,13 @@ func UpdateUser(c *gin.Context) {
 		"user": dto.ToUserResponse(user),
 	})
 
-	utils.LogAudit(authUserID, "update_user", "user", user.ID)
+	metadata := fmt.Sprintf("input: %+v", input)
+	utils.LogAudit(c, "update_user", "user", user.ID, metadata)
 
 }
 
 func DeleteUser(c *gin.Context) {
 
-	authUserID := c.GetUint("user_id")
 	idParam := c.Param("id")
 	targetID, err := strconv.Atoi(idParam)
 	if err != nil {
@@ -151,7 +150,7 @@ func DeleteUser(c *gin.Context) {
 		"message": "Пользователь удален",
 	})
 
-	utils.LogAudit(authUserID, "delete_user", "user", user.ID)
+	utils.LogAudit(c, "delete_user", "user", user.ID, "")
 
 }
 
@@ -253,4 +252,7 @@ func UploadAvatar(c *gin.Context) {
 	utils.RespondOK(c, gin.H{
 		"avatar_url": avatarURL,
 	})
+
+	utils.LogAudit(c, "upload_avatar", "user", user.ID, file.Filename)
+
 }

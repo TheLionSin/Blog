@@ -24,4 +24,8 @@ type AuditLog struct {
 	Object    string    // над каким типом сущности (user, avatar, team)
 	ObjectID  uint      // ID объекта
 	Timestamp time.Time `gorm:"autoCreateTime"`
+
+	IP        string
+	UserAgent string
+	Metadata  string
 }
