@@ -10,7 +10,7 @@ func RunMigrations() {
 	db := storage.DB
 
 	err := db.AutoMigrate(
-		&models.User{},
+		&models.User{}, &models.AuditLog{},
 	)
 
 	if err != nil {

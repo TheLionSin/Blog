@@ -16,3 +16,12 @@ type User struct {
 
 	gorm.DeletedAt `gorm:"index"`
 }
+
+type AuditLog struct {
+	ID        uint      `gorm:"primary_key"`
+	UserID    uint      // кто выполнил
+	Action    string    // тип действия (delete_user, update_email и т.д.)
+	Object    string    // над каким типом сущности (user, avatar, team)
+	ObjectID  uint      // ID объекта
+	Timestamp time.Time `gorm:"autoCreateTime"`
+}

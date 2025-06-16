@@ -77,6 +77,7 @@ func CreateUser(c *gin.Context) {
 
 func UpdateUser(c *gin.Context) {
 
+	authUserID := c.GetUint("user_id")
 	idParam := c.Param("id")
 	targetID, err := strconv.Atoi(idParam)
 	if err != nil {
@@ -121,10 +122,13 @@ func UpdateUser(c *gin.Context) {
 		"user": dto.ToUserResponse(user),
 	})
 
+	utils.LogAudit(authUserID, "update_user", "user", user.ID)
+
 }
 
 func DeleteUser(c *gin.Context) {
 
+	authUserID := c.GetUint("user_id")
 	idParam := c.Param("id")
 	targetID, err := strconv.Atoi(idParam)
 	if err != nil {
@@ -146,6 +150,8 @@ func DeleteUser(c *gin.Context) {
 	utils.RespondOK(c, gin.H{
 		"message": "Пользователь удален",
 	})
+
+	utils.LogAudit(authUserID, "delete_user", "user", user.ID)
 
 }
 
