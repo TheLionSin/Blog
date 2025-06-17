@@ -173,7 +173,23 @@ func GetUsers(c *gin.Context) {
 	}
 	offset := (page - 1) * limit
 
-	query := storage.DB.Model(&models.User{}).Limit(limit).Offset(offset)
+	orderBy := c.DefaultQuery("order_by", "id")
+	desc := c.DefaultQuery("desc", "false")
+	validFields := map[string]bool{
+		"id":         true,
+		"email":      true,
+		"nickname":   true,
+		"created_at": true,
+	}
+	if !validFields[orderBy] {
+		orderBy = "id"
+	}
+	sortDirection := "ASC"
+	if desc == "true" {
+		sortDirection = "DESC"
+	}
+
+	query := storage.DB.Model(&models.User{})
 	if search := c.Query("search"); search != "" {
 		term := "%" + search + "%"
 		query = query.Where("nickname ILIKE ? OR email ILIKE ?", term, term)
@@ -189,6 +205,11 @@ func GetUsers(c *gin.Context) {
 		query = query.Where("nickname ILIKE ?", "%"+nickname+"%")
 	}
 
+	var total int64
+	query.Count(&total)
+
+	query = query.Order(fmt.Sprintf("%s %s", orderBy, sortDirection)).Limit(limit).Offset(offset)
+
 	if err := query.Find(&users).Error; err != nil {
 		utils.RespondError(c, http.StatusInternalServerError, "Ошибка при получении пользователей")
 		return
@@ -203,6 +224,7 @@ func GetUsers(c *gin.Context) {
 		"users": response,
 		"page":  page,
 		"limit": limit,
+		"total": total, // 👈 общее количество найденных записей
 	})
 
 }
