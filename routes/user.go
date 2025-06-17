@@ -20,6 +20,6 @@ func RegisterUserRoutes(r *gin.Engine) {
 	adminRoutes := r.Group("/admin")
 	adminRoutes.Use(middleware.RequireAuth(), middleware.RequireAdmin())
 	adminRoutes.GET("/users", handlers.GetUsers)
-
+	adminRoutes.PUT("/user/:id/restore", handlers.RestoreUser)
 	adminRoutes.GET("/audit-logs", handlers.GetAuditLogs)
 }
