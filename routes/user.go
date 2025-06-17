@@ -21,5 +21,7 @@ func RegisterUserRoutes(r *gin.Engine) {
 	adminRoutes.Use(middleware.RequireAuth(), middleware.RequireAdmin())
 	adminRoutes.GET("/users", handlers.GetUsers)
 	adminRoutes.PUT("/user/:id/restore", handlers.RestoreUser)
+	adminRoutes.GET("/users/export",handlers.ExportUsersCSV)
 	adminRoutes.GET("/audit-logs", handlers.GetAuditLogs)
+
 }
