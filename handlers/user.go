@@ -162,7 +162,6 @@ func GetUsers(c *gin.Context) {
 
 	limitStr := c.DefaultQuery("limit", "10")
 	pageStr := c.DefaultQuery("page", "1")
-	search := c.Query("search")
 
 	limit, _ := strconv.Atoi(limitStr)
 	page, _ := strconv.Atoi(pageStr)
@@ -174,10 +173,20 @@ func GetUsers(c *gin.Context) {
 	}
 	offset := (page - 1) * limit
 
-	query := storage.DB.Limit(limit).Offset(offset)
-	if search != "" {
+	query := storage.DB.Model(&models.User{}).Limit(limit).Offset(offset)
+	if search := c.Query("search"); search != "" {
 		term := "%" + search + "%"
-		query = query.Where("name ILIKE ? or email ILIKE ?", term, term)
+		query = query.Where("nickname ILIKE ? OR email ILIKE ?", term, term)
+	}
+
+	if role := c.Query("role"); role != "" {
+		query = query.Where("role = ?", role)
+	}
+	if email := c.Query("email"); email != "" {
+		query = query.Where("email ILIKE ?", "%"+email+"%")
+	}
+	if nickname := c.Query("nickname"); nickname != "" {
+		query = query.Where("nickname ILIKE ?", "%"+nickname+"%")
 	}
 
 	if err := query.Find(&users).Error; err != nil {
@@ -192,6 +201,8 @@ func GetUsers(c *gin.Context) {
 
 	utils.RespondOK(c, gin.H{
 		"users": response,
+		"page":  page,
+		"limit": limit,
 	})
 
 }
