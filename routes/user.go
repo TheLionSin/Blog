@@ -10,7 +10,6 @@ func RegisterUserRoutes(r *gin.Engine) {
 	protected := r.Group("/")
 	protected.Use(middleware.RequireAuth())
 
-	protected.GET("/users", handlers.GetUsers)
 	protected.GET("/user/:id", handlers.GetUser)
 	protected.POST("/user", handlers.CreateUser)
 	protected.GET("/me", handlers.GetCurrentUser)
@@ -20,6 +19,7 @@ func RegisterUserRoutes(r *gin.Engine) {
 
 	adminRoutes := r.Group("/admin")
 	adminRoutes.Use(middleware.RequireAuth(), middleware.RequireAdmin())
+	adminRoutes.GET("/users", handlers.GetUsers)
 
 	adminRoutes.GET("/audit-logs", handlers.GetAuditLogs)
 }
