@@ -121,7 +121,9 @@ func UpdateUser(c *gin.Context) {
 		"user": dto.ToUserResponse(user),
 	})
 
-	metadata := fmt.Sprintf("input: %+v", input)
+	inputForLog := input
+	inputForLog.Password = ""
+	metadata := fmt.Sprintf("input: %+v", inputForLog)
 	utils.LogAudit(c, "update_user", "user", user.ID, metadata)
 
 }

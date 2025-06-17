@@ -17,4 +17,9 @@ func RegisterUserRoutes(r *gin.Engine) {
 	protected.POST("user/avatar", handlers.UploadAvatar)
 	protected.PUT("/user/:id", middleware.CanEditOrAdmin(), handlers.UpdateUser)
 	protected.DELETE("/user/:id", middleware.CanEditOrAdmin(), handlers.DeleteUser)
+
+	adminRoutes := r.Group("/admin")
+	adminRoutes.Use(middleware.RequireAuth(), middleware.RequireAdmin())
+
+	adminRoutes.GET("/audit-logs", handlers.GetAuditLogs)
 }
